@@ -1,4 +1,5 @@
 (library
  (name test_io)
- (libraries index index.unix unix alcotest fmt logs logs.fmt re stdlib-shims
-   threads.posix repr semaphore-compat optint mtime.clock.os))
+ (libraries index index.unix unix alcotest fmt fmt.tty logs logs.fmt
+   logs.threaded re stdlib-shims threads.posix repr semaphore-compat optint
+   mtime.clock.os))
