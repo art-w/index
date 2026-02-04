@@ -303,23 +303,30 @@ module IO : Index.Platform.IO with type io = io = struct
       let cstruct = Cstruct.string str in
       Eio.File.pwrite_single fd ~file_offset:Int63.zero [ cstruct ]
 
-    let unsafe_lock ~io _op filename =
+    let unsafe_lock ~io op filename =
       let f = Eio.Path.(io.root / filename) in
       mkdir_of f;
       let fd = Eio.Path.open_out ~sw:io.switch ~create:(`If_missing 0o600) f in
       let pid = string_of_int (Unix.getpid ()) in
       let pid_len = String.length pid in
       try
-        (* TODO: Unix.lockf fd op 0; *)
+        (* Get the underlying Unix file descriptor to use with Unix.lockf *)
+        (match Eio_unix.Resource.fd_opt fd with
+        | Some eio_fd ->
+            Eio_unix.Fd.use_exn "lockf" eio_fd (fun unix_fd ->
+              Unix.lockf unix_fd op 0
+            )
+        | None ->
+            failwith "File descriptor does not support Unix operations"
+        );
         if single_write fd pid <> pid_len then (
           Eio.Resource.close fd;
           failwith "Unable to write PID to lock file")
         else Some fd
       with
-      (* TODO:
-         | Unix.Unix_error (Unix.EAGAIN, _, _) ->
-             Eio.Resource.close fd;
-             None *)
+      | Unix.Unix_error (Unix.EAGAIN, _, _) ->
+          Eio.Resource.close fd;
+          None
       | e ->
         Eio.Resource.close fd;
         raise e
